@@ -6,7 +6,7 @@ The list is an external / stand alone text file consisting of lines of the form:
 <network>/<mask>,<tag>
 ```
 
-The filter can be made to re-load it's in-memory representation of the contents of the
+The filter can be made to re-load its in-memory representation of the contents of the
 map file without interrupting/restarting the logstash instance by touching a flag file.
 
 When a netflow event matches the CIDR spec, two tags are set:
