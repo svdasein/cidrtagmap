@@ -26,7 +26,11 @@ filter{
 }
 ```
 
-Tell the filter to reload its map by touching <mapfilepath>.RELOAD
+Tell the filter to reload its map
+
+```
+touch <mapfilepath>.RELOAD
+```
 
 Reloading is thread safe.
 
