@@ -1,12 +1,12 @@
 Gem::Specification.new do |s|
   s.name = 'logstash-filter-cidrtagmap'
-  s.version         = '1.1.0'
+  s.version         = '1.2.0'
   s.licenses = ['Apache License (2.0)']
-  s.summary = "This cidrtagmap filter replaces the contents of the message field with the specified value."
+  s.summary = "Filter adds tags to netflow records in logstash based on a static table of cidr->name and adds asn name fields"
   s.description     = "This gem is a Logstash plugin required to be installed on top of the Logstash core pipeline using $LS_HOME/bin/logstash-plugin install gemname. This gem is not a stand-alone program"
   s.authors = ["svdasein"]
   s.email = 'daveparker01@gmail.com'
-  s.homepage = "http://www.elastic.co/guide/en/logstash/current/index.html"
+  s.homepage = "https://github.com/svdasein/cidrtagmap"
   s.require_paths = ["lib"]
 
   # Files
