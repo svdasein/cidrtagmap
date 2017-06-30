@@ -1,4 +1,4 @@
-This logstash filter tags netflow records according to a list of CIDR to tag mappings.
+This logstash filter tags netflow records according to a list of CIDR to tag mappings, and adds ASN names for the src_as and dst_as fields.
 
 The list is an external / stand alone text file consisting of lines of the form:
 
@@ -15,6 +15,8 @@ src_tag = the tag associated with the spec that matched
 
 src_tagMatch = the CIDR spec that matched (as rendered by IPAddr.to_s)
 
+Download the asn map file here: ftp://ftp.arin.net/info/asn.txt 
+
 
 Configuration:
 
@@ -22,11 +24,12 @@ Configuration:
 filter{
         cidrtagmap {
                 mapfilepath => "cidrmap.txt"
+		asnmapfilepath => "asn.txt"
         }
 }
 ```
 
-Tell the filter to reload its map
+Tell the filter to reload its maps
 
 ```
 touch <mapfilepath>.RELOAD
