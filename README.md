@@ -33,5 +33,3 @@ touch <mapfilepath>.RELOAD
 ```
 
 Reloading is thread safe.
-
-Put cidrtagmap.rb in $LOGSTASH/lib/logstash/filters/
