@@ -27,7 +27,8 @@ class LogStash::Filters::CIDRTagMap < LogStash::Filters::Base
 
 	milestone 1
 
-	config :mapfilepath, :validate => :string
+	config :mapfilepath, :validate => :string, :default => 'cidrmap.txt'
+	config :asnmapfilepath, :validate => :string, :default => 'asn.txt'
 
 
 	private
@@ -68,6 +69,14 @@ class LogStash::Filters::CIDRTagMap < LogStash::Filters::Base
 						@logger.warn("cidrtagmap: error opening map file #{@mapfilepath}\n")
 						@mapFile = nil
 					end
+					begin
+						asntable = File.readlines(@asnmapfilepath)
+						regex = /^ (\d+?)\s+(.+?)\s+/
+						@asnmap = Hash[asntable.collect { |line| line.match(regex)}.select {|each| not each.nil?}.collect{|each| [each[1],each[2]] }]
+					rescue Exception => e
+						@logger.warn("cidrtagmap: error loading asn map file #{@asnmapfilepath}\n")
+						@logger.warn("cidrtagmap: #{e.inspect}")
+					end
 				else
 					@logger.debug("cidrtagmap: someone already loaded the map - I'm outta here")
 				end
@@ -90,6 +99,14 @@ class LogStash::Filters::CIDRTagMap < LogStash::Filters::Base
 			end
 		rescue
 			@logger.warn("cidrtagmap: error attempting to map #{addrString}\n")
+		end
+	end
+
+	def asNameForNumber(as = 0)
+		begin
+			return @asnmap[as.to_s] || "UNKNOWN"
+		rescue
+			return "MAPERROR"
 		end
 	end
 
@@ -124,6 +141,24 @@ class LogStash::Filters::CIDRTagMap < LogStash::Filters::Base
 					@logger.debug("cidrtagmap: tagging dst #{netflow['ipv4_dst_addr']} with #{dst_map.tag}")
 					netflow["dst_tag"] = dst_map.tag
 					netflow["dst_tagMatch"] = dst_map.range.to_s
+					filter_matched(event)
+				end
+			end
+			if netflow["dst_as"]
+				@logger.debug("cidrtagmap: checking for dst_as #{netflow['dst_as']}")
+				dst_asname = asNameForNumber(netflow["dst_as"])
+				if dst_asname
+					@logger.debug("cidrtagmap: tagging dst_as #{netflow['dst_as']} with #{dst_asname}")
+					netflow["dst_as_name"] = dst_asname
+					filter_matched(event)
+				end
+			end
+			if netflow["src_as"]
+				@logger.debug("cidrtagmap: checking for src_as #{netflow['src_as']}")
+				src_asname = asNameForNumber(netflow["src_as"])
+				if src_asname
+					@logger.debug("cidrtagmap: tagging src_as #{netflow['src_as']} with #{src_asname}")
+					netflow["src_as_name"] = src_asname
 					filter_matched(event)
 				end
 			end
