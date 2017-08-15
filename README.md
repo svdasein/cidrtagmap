@@ -1,38 +1,49 @@
-This logstash filter tags netflow records according to a list of CIDR to tag mappings, and adds ASN names for the src_as and dst_as fields.
+This logstash filter tags events according to a list of CIDR to tag mappings, and optionally maps ASN numbers to names
 
-The list is an external / stand alone text file consisting of lines of the form:
+
+Example:
+
+```
+cidrtagmap {
+        mapfilepath => "/path/to/ipmap/file"
+        asnmapfilepath => "/path/to/asnmap/file"
+        ipfieldlist => [
+		'host',
+		'[netflow][dst_address]',
+		'[etc]'
+	]
+        asfieldlist => [
+		'[netflow][dst_as]',
+		'[netflow][src_as]
+	]
+}
+```
+
+* mapfilepath (required) points to an  external / stand alone text file consisting of lines of the form:
 
 ```
 <network>/<mask>,<tag>
 ```
 
 The filter can be made to re-load its in-memory representation of the contents of the
-map file without interrupting/restarting the logstash instance by touching a flag file.
-
-When a netflow event matches the CIDR spec, two tags are set:
-
-src_tag = the tag associated with the spec that matched
-
-src_tagMatch = the CIDR spec that matched (as rendered by IPAddr.to_s)
-
-Download the asn map file here: ftp://ftp.arin.net/info/asn.txt 
-
-
-Configuration:
-
-```
-filter{
-        cidrtagmap {
-                mapfilepath => "cidrmap.txt"
-		asnmapfilepath => "asn.txt"
-        }
-}
-```
-
-Tell the filter to reload its maps
+ipmap file without interrupting/restarting the logstash instance by touching a flag file.
 
 ```
 touch <mapfilepath>.RELOAD
 ```
 
-Reloading is thread safe.
+
+* asnmapfilepath (optional) points to a copy of this file: ftp://ftp.arin.net/info/asn.txt 
+
+
+* ipfieldlist (required) is a list of event fields that will be eligible for mapping.  Everything that matches
+will be put in a structure subtending an item called cidrtagmap, so
+from the above example a match of the [netflow][dst_address] field would add
+cidrtagmap.netflow.dst_address.tag.  A pair to this field will be cidrtagmap.netflow.dst_address.match 
+which indicates which rule was matched for the mapping.
+
+* asnfieldlist (optional) is a list of fields presumed to contain asn numbers.  Everything that matches
+will add e.g. cidrtagmap.netflow.dst_as.asname
+
+
+
