@@ -2,6 +2,7 @@
 require "logstash/filters/base"
 require "logstash/namespace"
 require 'ipaddr'
+require 'redis'
 
 class MapEntry
 	attr_reader :range,:tag
@@ -28,14 +29,29 @@ class LogStash::Filters::CIDRTagMap < LogStash::Filters::Base
 
 	config :mapfilepath, :validate => :string, :default => 'cidrmap.txt'
 	config :asnmapfilepath, :validate => :string, :default => 'asn.txt'
-	config :ipfieldlist, :required => true, :list => true , :validate => :string
+	config :ipfieldlist, :optional=> true, :list => true , :validate => :string
+	config :redisserver, :optional=> true, :validate => :string
+	config :redisnamespace, :optional=> true, :validate => :string
 	config :asfieldlist, :list => true, :validate => :string
 
 
 	private
 
+
+	def loadAsnMap
+		begin
+			asntable = File.readlines(@asnmapfilepath)
+			regex = /^ (\d+?)\s+(.+?)\s+/
+			@asnmap = Hash[asntable.collect { |line| line.match(regex)}.select {|each| not each.nil?}.collect{|each| [each[1],each[2]] }]
+			@logger.info("cidrtagmap: loaded asn map file #{@asnmapfilepath}")
+		rescue Exception => e
+			@logger.warn("cidrtagmap: error loading asn map file #{@asnmapfilepath}")
+			@logger.warn("cidrtagmap: #{e.inspect}")
+		end
+	end
+
 	def loadLatestMap
-		if File.exist?(@reloadFlagPath) or @cidrMap.nil?
+		if not @redis and (File.exist?(@reloadFlagPath) or @cidrMap.nil?)
 			@logger.debug("cidrtagmap: need to load, getting mutex")
 			@mutex.synchronize {
 				# Test again now that we have the floor just in case someone else did it already
@@ -70,18 +86,40 @@ class LogStash::Filters::CIDRTagMap < LogStash::Filters::Base
 						@logger.warn("cidrtagmap: error opening map file #{@mapfilepath}\n")
 						@mapFile = nil
 					end
-					begin
-						asntable = File.readlines(@asnmapfilepath)
-						regex = /^ (\d+?)\s+(.+?)\s+/
-						@asnmap = Hash[asntable.collect { |line| line.match(regex)}.select {|each| not each.nil?}.collect{|each| [each[1],each[2]] }]
-					rescue Exception => e
-						@logger.warn("cidrtagmap: error loading asn map file #{@asnmapfilepath}\n")
-						@logger.warn("cidrtagmap: #{e.inspect}")
-					end
+					loadAsnMap
 				else
 					@logger.debug("cidrtagmap: someone already loaded the map - I'm outta here")
 				end
 			}
+		elsif @redis
+			if not @redisnamespace
+				@logger.warn("cidrtagmap: redisnamespace not defined - using cidrtagmap")
+				@redisnamespace = 'cidrtagmap'
+			end
+			if @redis["#{@redisnamespace}.reloadmap"] == '1' or @cidrMap.nil?
+				@mutex.synchronize {
+					if @redis["#{@redisnamespace}.reloadmap"] == '1' or @cidrMap.nil?
+						@redis["#{@redisnamespace}.reloadmap"] = '0'
+						@logger.info("cidrtagmap: refreshing map from redis server at #{@redisserver} using namespace '#{@redisnamespace}'")
+						begin
+							rawcidrmap = @redis.hgetall("#{@redisnamespace}.cidrmap")
+							@cidrMap = rawcidrmap.each.map{ |cidr,tag|
+								MapEntry.new("#{cidr},#{tag}")
+							}
+							@cidrMap = @cidrMap.reject { |item| item.nil? }
+							@logger.info("cidrtagmap: loaded #{@cidrMap.inspect}")
+						rescue Exception => e
+							@logger.error("cidrtagmap: error attempting to load map from redis")
+							@logger.error(e.inspect)
+						end
+						loadAsnMap
+					else
+						@logger.debug("cidrtagmap: someone already loaded the map - I'm outta here")
+					end
+				}
+			end
+		else
+			@logger.error("cidrtagmap: Configuration doesn't give me any way to load a cidr map - I won't be doing anything useful")
 		end
 	end
 
@@ -114,28 +152,41 @@ class LogStash::Filters::CIDRTagMap < LogStash::Filters::Base
 	public
 	def register
 		@mutex = Mutex.new
-		@reloadFlagPath = "#{@mapfilepath}.RELOAD"
-		@logger.info("cidrtagmap: NOTE: touch #{@reloadFlagPath} to force map reload")
+		if @redisserver
+			begin
+				@redis = Redis.new(:host=>@redisserver)
+				@logger.info("cidrtagmap: connected to redis server at #{@redisserver}")
+			rescue Exception => e
+				@logger.error("cidrtagmap: failed to connect to redis server at #{@redisserver}")
+			end
+		else
+			@reloadFlagPath = "#{@mapfilepath}.RELOAD"
+			@logger.info("cidrtagmap: NOTE: touch #{@reloadFlagPath} to force map reload")
+		end
 		loadLatestMap
 	end
 
 	public
 	def filter(event)
 		return unless filter?(event)
-		# There *will* be an @ipfieldlist - this is enforced by the :required directive above
-		@ipfieldlist.each { |fieldname|
-			@logger.debug("cidrtagmap: looking for ipfield '#{fieldname}'")
-			if ipvalue = event.get(fieldname)
-				@logger.debug("cidrtagmap: I found ipfield #{fieldname} with value #{ipvalue}")
-				mapping = mapForIp(ipvalue)
-				if mapping
-					@logger.debug("cidrtagmap: I mapped IP address #{ipvalue} to #{mapping.tag} via range #{mapping.range.to_s}")
-					event.set("[cidrtagmap]#{fieldname}[tag]",mapping.tag)
-					event.set("[cidrtagmap]#{fieldname}[match]",mapping.range.to_s)
-					filter_matched(event)
+		loadLatestMap
+		if @ipfieldlist
+			@ipfieldlist.each { |fieldname|
+				@logger.debug("cidrtagmap: looking for ipfield '#{fieldname}'")
+				if ipvalue = event.get(fieldname)
+					@logger.debug("cidrtagmap: I found ipfield #{fieldname} with value #{ipvalue}")
+					mapping = mapForIp(ipvalue)
+					if mapping
+						@logger.debug("cidrtagmap: I mapped IP address #{ipvalue} to #{mapping.tag} via range #{mapping.range.to_s}")
+						event.set("[cidrtagmap]#{fieldname}[tag]",mapping.tag)
+						event.set("[cidrtagmap]#{fieldname}[match]",mapping.range.to_s)
+						filter_matched(event)
+					end
 				end
-			end
-		}
+			}
+		else
+			@logger.warn("cidrtagmap: No IP field list defined - not attempting to translate ip addresses!")
+		end
 		if @asfieldlist
 			@asfieldlist.each { |fieldname|
 				@logger.debug("cidrtagmap: looking for asfield '#{fieldname}'")
