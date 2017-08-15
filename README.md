@@ -22,10 +22,13 @@ cidrtagmap {
 }
 ```
 
+
+CIDR map configuration
+----------------------
+
 You must specify a map source. Currently there are two forms of this: file based and redis based.
 
-File based configuration:
--------------------------
+### File based configuration:
 
 * mapfilepath points to an  external / stand alone text file consisting of lines of the form:
 
@@ -41,8 +44,7 @@ touch <mapfilepath>.RELOAD
 ```
 
 
-Redis based configuration:
---------------------------
+### Redis based configuration:
 
 * redisserver = name or ip address of redis server to connect to. If you define this you should also define:
 * redisnamespace = string that will act as a prefix to variables stored in redis
