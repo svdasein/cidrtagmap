@@ -1,3 +1,4 @@
+# encoding: utf-8
 require "logstash/filters/base"
 require "logstash/namespace"
 require 'ipaddr'
@@ -25,10 +26,10 @@ class LogStash::Filters::CIDRTagMap < LogStash::Filters::Base
 
 	config_name "cidrtagmap"
 
-	milestone 1
-
 	config :mapfilepath, :validate => :string, :default => 'cidrmap.txt'
 	config :asnmapfilepath, :validate => :string, :default => 'asn.txt'
+	config :ipfieldlist, :required => true, :list => true , :validate => :string
+	config :asfieldlist, :list => true, :validate => :string
 
 
 	private
@@ -121,47 +122,36 @@ class LogStash::Filters::CIDRTagMap < LogStash::Filters::Base
 	public
 	def filter(event)
 		return unless filter?(event)
-		if event['netflow']
-			loadLatestMap
-			netflow = event['netflow']
-			if netflow["ipv4_src_addr"]
-				@logger.debug("cidrtagmap: checking for src #{netflow['ipv4_src_addr']}")
-				src_map = mapForIp(netflow["ipv4_src_addr"])
-				if src_map
-					@logger.debug("cidrtagmap: tagging src #{netflow['ipv4_src_addr']} with #{src_map.tag}")
-					netflow["src_tag"] = src_map.tag
-					netflow['src_tagMatch'] = src_map.range.to_s
+		# There *will* be an @ipfieldlist - this is enforced by the :required directive above
+		@ipfieldlist.each { |fieldname|
+			@logger.debug("cidrtagmap: looking for ipfield '#{fieldname}'")
+			if ipvalue = event.get(fieldname)
+				@logger.debug("cidrtagmap: I found ipfield #{fieldname} with value #{ipvalue}")
+				mapping = mapForIp(ipvalue)
+				if mapping
+					@logger.debug("cidrtagmap: I mapped IP address #{ipvalue} to #{mapping.tag} via range #{mapping.range.to_s}")
+					event.set("[cidrtagmap]#{fieldname}[tag]",mapping.tag)
+					event.set("[cidrtagmap]#{fieldname}[match]",mapping.range.to_s)
 					filter_matched(event)
 				end
 			end
-			if netflow["ipv4_dst_addr"]
-				@logger.debug("cidrtagmap: checking for dst #{netflow['ipv4_dst_addr']}")
-				dst_map = mapForIp(netflow["ipv4_dst_addr"])
-				if dst_map
-					@logger.debug("cidrtagmap: tagging dst #{netflow['ipv4_dst_addr']} with #{dst_map.tag}")
-					netflow["dst_tag"] = dst_map.tag
-					netflow["dst_tagMatch"] = dst_map.range.to_s
-					filter_matched(event)
+		}
+		if @asfieldlist
+			@asfieldlist.each { |fieldname|
+				@logger.debug("cidrtagmap: looking for asfield '#{fieldname}'")
+				if asvalue = event.get(fieldname)
+					@logger.debug("cidrtagmap: I found asfield #{fieldname} with value #{asvalue}")
+					asname = asNameForNumber(asvalue)
+					if asname
+						@logger.debug("cidrtagmap: I mapped as number #{asvalue} to #{asname}")
+						event.set("[cidrtagmap]#{fieldname}[asname]",asname)
+						filter_matched(event)
+					end
 				end
-			end
-			if netflow["dst_as"]
-				@logger.debug("cidrtagmap: checking for dst_as #{netflow['dst_as']}")
-				dst_asname = asNameForNumber(netflow["dst_as"])
-				if dst_asname
-					@logger.debug("cidrtagmap: tagging dst_as #{netflow['dst_as']} with #{dst_asname}")
-					netflow["dst_as_name"] = dst_asname
-					filter_matched(event)
-				end
-			end
-			if netflow["src_as"]
-				@logger.debug("cidrtagmap: checking for src_as #{netflow['src_as']}")
-				src_asname = asNameForNumber(netflow["src_as"])
-				if src_asname
-					@logger.debug("cidrtagmap: tagging src_as #{netflow['src_as']} with #{src_asname}")
-					netflow["src_as_name"] = src_asname
-					filter_matched(event)
-				end
-			end
+			}
+		else
+			@logger.debug("cidrtagmap: No as field list defined - not attempting to translate asnames!")
 		end
+
 	end
 end 

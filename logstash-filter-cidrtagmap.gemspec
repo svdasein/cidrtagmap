@@ -1,7 +1,7 @@
 Gem::Specification.new do |s|
   s.name = 'logstash-filter-cidrtagmap'
-  s.version         = '1.2.0'
-  s.licenses = ['Apache License (2.0)']
+  s.version         = '2.0.0'
+  s.licenses = ['Apache-2.0']
   s.summary = "Filter adds tags to netflow records in logstash based on a static table of cidr->name and adds asn name fields"
   s.description     = "This gem is a Logstash plugin required to be installed on top of the Logstash core pipeline using $LS_HOME/bin/logstash-plugin install gemname. This gem is not a stand-alone program"
   s.authors = ["svdasein"]
@@ -18,6 +18,6 @@ Gem::Specification.new do |s|
   s.metadata = { "logstash_plugin" => "true", "logstash_group" => "filter" }
 
   # Gem dependencies
-  s.add_runtime_dependency "logstash-core-plugin-api", "~> 1.8"
+  s.add_runtime_dependency "logstash-core-plugin-api", "~> 2.0"
   s.add_development_dependency 'logstash-devutils'
 end
