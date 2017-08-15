@@ -32,7 +32,7 @@ class LogStash::Filters::CIDRTagMap < LogStash::Filters::Base
 	config :ipfieldlist, :optional=> true, :list => true , :validate => :string
 	config :redisserver, :optional=> true, :validate => :string
 	config :redisnamespace, :optional=> true, :validate => :string
-	config :asfieldlist, :list => true, :validate => :string
+	config :asnfieldlist, :list => true, :validate => :string
 
 
 	private
@@ -51,7 +51,7 @@ class LogStash::Filters::CIDRTagMap < LogStash::Filters::Base
 	end
 
 	def loadLatestMap
-		if not @redis and (File.exist?(@reloadFlagPath) or @cidrMap.nil?)
+		if (not @redisserver) and (File.exist?(@reloadFlagPath) or @cidrMap.nil?)
 			@logger.debug("cidrtagmap: need to load, getting mutex")
 			@mutex.synchronize {
 				# Test again now that we have the floor just in case someone else did it already
@@ -91,7 +91,7 @@ class LogStash::Filters::CIDRTagMap < LogStash::Filters::Base
 					@logger.debug("cidrtagmap: someone already loaded the map - I'm outta here")
 				end
 			}
-		elsif @redis
+		elsif @redisserver
 			if not @redisnamespace
 				@logger.warn("cidrtagmap: redisnamespace not defined - using cidrtagmap")
 				@redisnamespace = 'cidrtagmap'
@@ -118,8 +118,6 @@ class LogStash::Filters::CIDRTagMap < LogStash::Filters::Base
 					end
 				}
 			end
-		else
-			@logger.error("cidrtagmap: Configuration doesn't give me any way to load a cidr map - I won't be doing anything useful")
 		end
 	end
 
@@ -187,11 +185,11 @@ class LogStash::Filters::CIDRTagMap < LogStash::Filters::Base
 		else
 			@logger.warn("cidrtagmap: No IP field list defined - not attempting to translate ip addresses!")
 		end
-		if @asfieldlist
-			@asfieldlist.each { |fieldname|
-				@logger.debug("cidrtagmap: looking for asfield '#{fieldname}'")
+		if @asnfieldlist
+			@asnfieldlist.each { |fieldname|
+				@logger.debug("cidrtagmap: looking for asnfield '#{fieldname}'")
 				if asvalue = event.get(fieldname)
-					@logger.debug("cidrtagmap: I found asfield #{fieldname} with value #{asvalue}")
+					@logger.debug("cidrtagmap: I found asnfield #{fieldname} with value #{asvalue}")
 					asname = asNameForNumber(asvalue)
 					if asname
 						@logger.debug("cidrtagmap: I mapped as number #{asvalue} to #{asname}")
