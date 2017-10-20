@@ -33,7 +33,7 @@ You must specify a map source. Currently there are two forms of this: file based
 * mapfilepath points to an  external / stand alone text file consisting of lines of the form:
 
 ```
-<network>/<mask>,<tag>
+<network>/<mask>,<tag>[,<tag>...]
 ```
 
 The filter can be made to re-load its in-memory representation of the contents of the
@@ -51,7 +51,7 @@ touch <mapfilepath>.RELOAD
 
 
 In redis then you should define two items:
-* redisnamespace.cidrmap = a hash with cidr => tag kv pairs
+* redisnamespace.cidrmap = a hash with cidr => tag kv pairs.  The value can be a comma separated list of tags.
 * redisnamespace.reloadmap = 1|0 - tell filter to reload map
 
 
@@ -61,7 +61,7 @@ Other configuration:
 * ipfieldlist (required) is a list of event fields that will be eligible for mapping.  Everything that matches
 will be put in a structure subtending an item called cidrtagmap, so
 from the above example a match of the [netflow][dst_address] field would add
-cidrtagmap.netflow.dst_address.tag.  A pair to this field will be cidrtagmap.netflow.dst_address.match 
+cidrtagmap.netflow.dst_address.tags.  A pair to this field will be cidrtagmap.netflow.dst_address.match 
 which indicates which rule was matched for the mapping.
 
 * asnmapfilepath (optional) points to a copy of this file: ftp://ftp.arin.net/info/asn.txt 

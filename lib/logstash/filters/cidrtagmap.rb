@@ -8,9 +8,9 @@ class MapEntry
 	attr_reader :range,:tag
 	def initialize(spec = "")
 		begin
-			parts = spec.split(',')
+			parts = spec.split(',',2)
 			@range = IPAddr.new(parts[0])
-			@tag = parts[1]
+			@tag = parts[1].split(',')
 			return self
 		rescue
 			@logger.warn("cidrtagmap: error parsing map entry #{spec}")
@@ -176,7 +176,7 @@ class LogStash::Filters::CIDRTagMap < LogStash::Filters::Base
 					mapping = mapForIp(ipvalue)
 					if mapping
 						@logger.debug("cidrtagmap: I mapped IP address #{ipvalue} to #{mapping.tag} via range #{mapping.range.to_s}")
-						event.set("[cidrtagmap]#{fieldname}[tag]",mapping.tag)
+						event.set("[cidrtagmap]#{fieldname}[tags]",mapping.tag)
 						event.set("[cidrtagmap]#{fieldname}[match]",mapping.range.to_s)
 						filter_matched(event)
 					end
