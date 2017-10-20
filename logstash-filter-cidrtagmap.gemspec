@@ -1,6 +1,6 @@
 Gem::Specification.new do |s|
   s.name = 'logstash-filter-cidrtagmap'
-  s.version         = '2.2.0'
+  s.version         = '2.2.1'
   s.licenses = ['Apache-2.0']
   s.summary = "Filter adds tags to events in logstash based on a table of cidr->name mappings  and optionally adds asn name fields"
   s.description     = "This gem is a Logstash plugin required to be installed on top of the Logstash core pipeline using $LS_HOME/bin/logstash-plugin install gemname. This gem is not a stand-alone program.  Filter adds tags to events in logstash based on a table of cidr->name mappings  and optionally adds asn name fields"
